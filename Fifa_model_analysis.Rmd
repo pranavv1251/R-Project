@@ -1,17 +1,24 @@
 ---
-title: "R Notebook"
+title: "FIFA Notebook"
 output: html_notebook
 ---
 
-This is an [R Markdown](http://rmarkdown.rstudio.com) Notebook. When you execute code within the notebook, the results appear beneath the code. 
+This is an [R ](http://rmarkdown.rstudio.com) Notebook. When you execute code within the notebook, the results appear beneath the code. 
 
-Try executing this chunk by clicking the *Run* button within the chunk or by placing your cursor inside it and pressing *Ctrl+Shift+Enter*. 
+---
 
+### Load the Data
 ```{r}
 library(readr)
 FullData <- read_csv("/home/oem/Code/mlprojects/FIFA/more/complete.csv", show_col_types = FALSE)
-complemento <- read_csv("/home/oem/Code/mlprojects/FIFA/demo/CompleteDataset.csv", show_col_types = FALSE)
+complement <- read_csv("/home/oem/Code/mlprojects/FIFA/demo/CompleteDataset.csv", show_col_types = FALSE)
+df <- read.csv("/home/oem/Code/mlprojects/FIFA/fifa21_male2.csv", stringsAsFactors = FALSE)
+
 ```
+
+---
+
+### Summary of the Data
 ```{r}
 library(data.table)
 setDT(FullData)
@@ -23,60 +30,115 @@ dim(FullData)
 ```
 ```{r}
 library(knitr)
-kable(head(FullData))
+head(FullData)
 ```
+
+---
+
+### Ages of football players
 ```{r}
 library(ggplot2)
-ggplot(FullData, aes(age, fill = age)) +
-geom_density(position = "stack") 
+ggplot(FullData, aes(age, fill = age)) + 
+geom_bar(position = "stack", color="black", fill= "#39a5f7") 
+
 ```
+
+---
+
+### Players' Overall
+
 ```{r}
 library(dplyr)
 FullData %>% 
   ggplot(aes(x = overall, fill = factor(overall))) +
-  geom_bar(color = "grey20") + guides(fill = FALSE)+
+  geom_bar(color = "grey30") + guides(fill = FALSE)+
   labs(title="Player's Overall ")
 ```
+
+---
+
+### Age vs Rating
 ```{r}
 agerating <- FullData[age<41,.("overall"=mean(overall)),by=age][order(-age)]
+agerating
 ggplot(data = agerating,aes(x=age,y=overall))+
   geom_line(color="red",size=2)+labs(title="Rating vs Age")+
   annotate("text", x = 30, y = max(agerating$overall),color="blue", label = "Max", parse = TRUE, size = 3)
 ```
+
+---
+
+### Best Players 
 ```{r}
 library(data.table)
-FullData %>% 
-  #arrange(-overall) %>% 
-  #top_n(15,wt = overall) %>% 
+FullData %>%  
   select(name, age,overall,club,eur_value) %>% 
   as.data.table(class = "nowrap hover row-border", escape = FALSE, options = list(dom = 't',scrollX = TRUE, autoWidth = TRUE))
 ```
+
+---
+
+### Physical Attributes of the Players
+#### Height in cm
 ```{r}
 FullData %>% 
-  ggplot(aes(x = height_cm, fill = factor(height_cm))) +
-  geom_bar(color = "grey20") + guides(fill = FALSE)+
+  ggplot(aes(x = height_cm)) +
+  geom_histogram(binwidth= 1,color = "#72a18b", fill="#72a18b") + 
   labs(title="Players Height")
-
-
 ```
+#### Weight in kg
 ```{r}
 FullData %>% 
-  ggplot(aes(x = weight_kg, y = overall, fill = factor(height_cm))) +
-  geom_point(color = "grey20") + guides(fill = FALSE)+
+  ggplot(aes(x = weight_kg)) +
+  geom_density(color = "#78081b", fill="lightblue") + 
+  geom_vline(aes(xintercept=mean(weight_kg)),
+            color="blue", linetype="dashed", size=1)+
   labs(title="Players Weight")
 ```
+
+#### Height and Weight
+```{r}
+library(plyr)
+mw <- ddply(FullData, "age", summarise, grp.meanw=mean(weight_kg), grp.meanh=mean(height_cm))
+ggplot(mw, aes(x=grp.meanw, y=grp.meanh, color = age)) + 
+  geom_point(aes()) +
+  geom_smooth(method=lm, se=FALSE, fullrange=TRUE)
+```
+
+---
+
+### Wage offered to Players w.r.t Ages
+```{r}
+d <- FullData[age<40,.("Wage"=mean(eur_wage)),by=age][order(-age)]
+ggplot(d, aes(x=age, y=Wage,label = age)) +
+  geom_line()+
+  geom_point(color= "blue") + 
+  geom_text(size =4,hjust=0, vjust=1.3)
+```
+
+---
+
+### Nationalities of Players
 ```{r}
 Nationalitys <- FullData[FullData$nationality!="",.N,by=.(nationality,`flag`)][order(-N)]
-
 Nationalitys = Nationalitys[,c(1,3)] 
 head(Nationalitys[order(Nationalitys$N, decreasing = TRUE),],10)
 ```
+
+---
+
+### Best Teams in the Game
+#### Best Clubs
 ```{r}
-TeamDF<-arrange(FullData[, list(Avg=mean(overall)), by= "club" ], desc(Avg) )
-
-kable(head(TeamDF, 10))
-
+TeamDF<-arrange(FullData[, list(Avg=mean(overall)), by= "club" ], desc(Avg) ) 
+head(TeamDF, 10)
 ```
+
+---
+
+## Clustering
+### Number of Clusters
+#### Ward's Method
 ```{r}
 cluster = FullData[,c(7,10,11,17:29,34:94)]
 cluster[is.na(cluster)] = 0
@@ -88,9 +150,12 @@ for (i in 2:10)
 plot(1:
        10, wss, type="b", xlab="Number of Cluster",  ylab="Squares Summatory")
 ```
+
+---
+
+### K Means Clustering
 ```{r}
 library(fpc)
-set.seed(123)
 km<-kmeans(cluster[,1:ncol(cluster)],4)
 cluster$grupo<-km$cluster
 FullData$grupo <-km$cluster
@@ -100,27 +165,69 @@ g3<- FullData[FullData$grupo==3,]
 g4<- FullData[FullData$grupo==4,]
 
 plotcluster(cluster[,1:(ncol(cluster)-1)],km$cluster)
-```
-```{r}
 
+```
+
+---
+
+### Player's Overall Ratings according to the groups
+```{r}
 g1 %>% 
   ggplot(aes(x = overall, fill = factor(overall))) +
   geom_histogram(binwidth=1)+
-  labs(title="Raiting de los Jugadores")
+  labs(title="Player Ratings for Group 1")
 
-ggplot(FullData %>% count(club), aes(x = club, n, group="eur_value")) + 
-  geom_line() +
-  labs(title = "Player Ratings")
+g2 %>% 
+  ggplot(aes(x = overall, fill = factor(overall))) +
+  geom_histogram(binwidth = 1) +
+  labs(title="Player Ratings for Group 2")
 
+g3 %>% 
+  ggplot(aes(x = overall, fill = factor(overall))) +
+  geom_histogram(binwidth=1)+
+  labs(title="Player Ratings for Group 3")
+
+g4 %>% 
+  ggplot(aes(x = overall, fill = factor(overall))) +
+  geom_histogram(binwidth=1)+
+  labs(title="Player Ratings for Group 4")
 
 ```
+
+### Density of EUR_Value for Players in Groups
 ```{r}
 ggplot(g1, aes(eur_value, fill = eur_value)) +
-geom_density(position = "stack")
+geom_density(position = "stack", fill = "#5f966e", color = "red")
+
+ggplot(g2, aes(eur_value, fill = eur_value)) +
+geom_density(position = "stack", fill = "#5f966e", color = "red")
+
+ggplot(g3, aes(eur_value, fill = eur_value)) +
+geom_density(position = "stack", fill = "#5f966e", color = "red")
+
+ggplot(g4, aes(eur_value, fill = eur_value)) +
+geom_density(position = "stack", fill = "#5f966e", color = "red")
 ```
+
+---
+
+### Comparison of Group1 and Group2
 ```{r}
 summary(g1$eur_value)
+summary(g2$eur_value)
 ```
+
+
+### Comparison of Group3 and Group4
+```{r}
+summary(g3$eur_value)
+summary(g4$eur_value)
+```
+
+---
+
+## Machine Learning
+### Predicting Position
 ```{r}
 library(caret)
 library(plyr)
@@ -134,12 +241,11 @@ specs = predict(specsNorm, specs)
 id_overall = FullData[,c(1,20)]
 specs = cbind(specs,id_overall)
 
-##Getting prefered_positions and ID
+##Getting preferred_positions and ID
 positions = complemento[,c(53,64)]   
 positions = data.frame(positions)
 
 ## Cleaning Preferred Positions
-
 prefered_positions = positions[,'Preferred.Positions']
 split = strsplit(prefered_positions, split=" ")
 positionVector = 0
@@ -174,14 +280,15 @@ selected_data = cbind(selected_data,positionVector)
 selected_data <- subset( selected_data, select = -ID )
 selected_data[,'Preferred.Positions'] = as.factor(selected_data[,'Preferred.Positions'])
 
-kable(head(selected_data))
+head(selected_data)
 ```
+### Splitting the Data 70/30
 ```{r}
-porciento <- 70/100
+percent <- 70/100
 
 set.seed(3)
 
-trainRowsNumber<-sample(1:nrow(selected_data),porciento*nrow(selected_data))
+trainRowsNumber<-sample(1:nrow(selected_data),percent*nrow(selected_data))
 train<-selected_data[trainRowsNumber,] 
 test<-selected_data[-trainRowsNumber,] 
 
@@ -190,31 +297,37 @@ ataque$Preferred.Positions = factor(ataque$Preferred.Positions)
 defensa = selected_data[selected_data[,'positionVector'] ==0,-positionVector]
 defensa$Preferred.Positions = factor(defensa$Preferred.Positions)
 
-trainRowsNumber<-sample(1:nrow(ataque),porciento*nrow(ataque))
+trainRowsNumber<-sample(1:nrow(ataque),percent*nrow(ataque))
 trainA<-ataque[trainRowsNumber,] 
 testA<-ataque[-trainRowsNumber,] 
 
-trainRowsNumber<-sample(1:nrow(defensa),porciento*nrow(defensa))
+trainRowsNumber<-sample(1:nrow(defensa),percent*nrow(defensa))
 trainD<-defensa[trainRowsNumber,] 
 testD<-defensa[-trainRowsNumber,] 
 
-kable(head(train)) 
+head(train)
 ```
+
+### Logistic Regression
 ```{r}
-modelo<-glm(positionVector~., data = train)
-pred<-predict(modelo,newdata = test)
+model<-glm(positionVector~., data = train)
+pred<-predict(model,newdata = test)
 pred = round(pred)
 cfmLR = confusionMatrix(table(pred,test$positionVector))
 cfmLR
 ```
+
+### SVM
+#### Attack
 ```{r}
 library(e1071)
 model <- svm(Preferred.Positions~. ,data=trainA,kernel = "linear")
 prediccion <- predict(model,testA)
-#prediccion = round(prediccion, digits = 0)
 cfmSVM<-confusionMatrix(table(prediccion,testA[,'Preferred.Positions']))
 cfmSVM
 ```
+
+#### Defense
 ```{r}
 modelD <- svm(Preferred.Positions~. ,data=trainD,kernel = "linear")
 prediccion <- predict(modelD,testD)
@@ -222,8 +335,373 @@ cfmSVM<-confusionMatrix(table(prediccion,testD[,'Preferred.Positions']))
 cfmSVM
 ```
 
-Add a new chunk by clicking the *Insert Chunk* button on the toolbar or by pressing *Ctrl+Alt+I*.
+---
 
-When you save the notebook, an HTML file containing the code and output will be saved alongside it (click the *Preview* button or press *Ctrl+Shift+K* to preview the HTML file).
 
-The preview shows you a rendered HTML copy of the contents of the editor. Consequently, unlike *Knit*, *Preview* does not run any R code chunks. Instead, the output of the chunk when it was last run in the editor is displayed.
+## Additional Analytics
+### Data Manipulation
+```{r}
+options(repr.matrix.max.cols=150)
+library(dplyr)
+library(stringr)
+library(tidyr)
+df2 <- suppressWarnings(df %>% 
+    # Remove Retired Players
+    separate(Contract, c("Contract1", "Contract2"), sep = " ~ ") %>%
+    mutate_at(vars(Contract1:Contract2), funs(as.numeric)) %>%
+    filter(Contract1 >= 2020 | Contract2 > 2020 ) %>%
+    # Height & Weight Transformation (KG, CM)
+    mutate(Height = round(
+    as.numeric(str_sub(str_remove_all(Height, '"'), start = 1, end = 1))*30.48 + as.numeric(str_sub(str_remove_all(Height, '"'), start = 3, end = 5))* 2.54
+    ),
+           Weight = round(as.numeric(str_sub(Weight, start = 1, end = 3)) / 2.204623)) %>%
+    # Create Position Class
+    mutate(Class = case_when(
+        
+        BP %in% c("CB", "RB", "LB", "LWB", "RWB", "LCB", "RCB") ~ "Defence",
+        BP == "GK" ~ "Goal Keeper",
+        BP %in% c("CM", "CDM","CAM","LM","RM", "LAM", "RAM", "LCM", "RCM", "LDM", "RDM") ~ "Midfielder",
+        TRUE ~ "Forward"
+        
+    )) %>%
+    # Market Values & Wage
+    mutate(
+        Values = as.numeric(str_replace_all(str_remove_all(str_remove_all(Value,"€"), "M"), "K", "000")),
+        Values = if_else(Values < 1000 , Values * 1000000, Values),
+        Wages = as.numeric(str_replace_all(str_remove_all(Wage,"€"), "K", "000"))
+
+    ))
+
+
+head(df2)
+```
+
+---
+
+### Draw Football Pitch
+```{r}
+pitch <- function(goaltype = c("box", "line", "barca_numbers"), pitch_theme = c("green","blue","night")){
+  
+  # Check Arguments
+  if(is.null(goaltype) | missing("goaltype")){goaltype <- "box"}
+  if(is.null(pitch_theme) | missing("pitch_theme")){pitch_theme <- "green"}
+  
+  # Field Colour
+  if(pitch_theme == "green"){
+    # Green
+    background_color = "#77BD77"
+    grass_color = "#77BD77"
+    # Dark Green
+    #background_color = "#538032"
+    #grass_color = "#538032"
+    line_color =  "#ffffff"
+    goal_color = "#000000"
+    
+  }else if(pitch_theme == "blue"){
+    
+    # Blue
+    grass_color = "#224C56" 
+    line_color =  "#B3CED9" 
+    background_color = "#224C56" 
+    goal_color = "#15393D"
+    
+  }else if(pitch_theme == "night"){
+    
+    # Night
+    grass_color = "#202020"
+    line_color =  "#797876"
+    background_color = "#202020"
+    goal_color = "#131313"
+  }else{
+    return(NULL)
+  }
+  
+  # All Parameters
+  # Size of the Field
+  ymin <- 0    # Minimum height
+  ymax <- 80   # Maximum Width
+  xmin <- 0    # Minimum Width
+  xmax <- 120  # Maximum Width
+  
+  # Off-Field Area
+  padding <- 5 # Default: 5
+  
+  # Penalty Area
+  boxEdgeDef <- 18
+  boxEdgeOff <- 102
+  boxEdgeLeft <- 18
+  boxEdgeRight <- 62
+  
+  # Half Field Line
+  halfwayline <- 60
+  
+  # Rectangle in Front of the Goal Inside the Penalty Area
+  sixYardDef <- 6
+  sixYardOff <- 114
+  sixYardLeft <- 30
+  sixYardRight <- 50
+  
+  # Half-Field Circle Parameters
+  CentreSpot <- 40
+  centreCirle_d <- 20
+  
+  # Function
+  circleFun <- function(center = c(0,0),diameter = 1, npoints = 100){
+    r = diameter / 2
+    tt <- seq(0,2*pi,length.out = npoints)
+    xx <- center[1] + r * cos(tt)
+    yy <- center[2] + r * sin(tt)
+    return(data.frame(x = xx, y = yy))
+  }
+  
+  center_circle <- circleFun(c(halfwayline,CentreSpot),centreCirle_d,npoints = 100)
+  
+  # Penalty Point
+  penSpotDef <- 12
+  penSpotOff <- 108
+  
+  # Theme Argument size: 12
+  size <- 12
+  
+  # Goal Line
+  goalPostLeft <- 36
+  goalPostRight <- 44
+  
+  
+  # Scratching the Field
+  
+  plot <- ggplot()+
+    
+    # 1. Boundaries of the Football Field
+    xlim(c(xmin-padding,xmax+padding)) + ylim(c(ymin-padding,ymax+padding))+
+    
+    # 2. Setting Theme
+    theme(
+      # 2.1. Removing Texts and Lines on Axes 
+      axis.text = element_blank(),
+      axis.ticks = element_blank(),
+      axis.title = element_blank(),
+      
+      # 2.2. Legend Adjustments
+      legend.background = element_rect(fill = background_color, colour = NA), 
+      legend.key = element_rect(fill = background_color),
+      legend.key.size = unit(1.2,"lines"),
+      legend.text = element_text(size = size),
+      legend.title=element_text(size=size, face="bold",hjust=0),
+      
+      # 2.3. Facet Adjustments - Editing Backgrounds and Texts
+      strip.background = element_rect(colour = background_color, fill = background_color, size = .5),
+      strip.text.y=element_text(colour=background_color,size = size, angle=270),
+      strip.text.x=element_text(size=size*1),
+      
+      # 2.4. Panel Adjustments
+      panel.background=element_rect(fill=background_color,colour=background_color),
+      panel.grid = element_blank(),
+      panel.spacing = element_blank(), 
+      
+      # 2.5. Plot Adjustments
+      plot.background=element_rect(background_color), 
+      plot.margin=unit(c(0, 0, 0, 0), "lines"), 
+      plot.title=element_text(size=size*1.2)
+    )+
+    
+    # 3. Field Line: Drawing the rectangle 
+    geom_rect(aes(xmin=xmin, xmax=xmax, ymin=ymin, ymax=ymax), fill = NA, colour = line_color)+
+    
+    # 4. Penalty Area: Drawing the Rectangle
+    geom_rect(aes(xmin=xmin, xmax=boxEdgeDef, ymin=boxEdgeLeft, ymax=boxEdgeRight), fill = grass_color, colour = line_color)+ # Sol Ceza Sahası
+    geom_rect(aes(xmin=boxEdgeOff, xmax=xmax, ymin=boxEdgeLeft, ymax=boxEdgeRight), fill = grass_color, colour = line_color)+ # Sağ Ceza Sahası
+    
+    # 5. Half Court Line
+    geom_segment(aes(x = halfwayline, y = ymin, xend = halfwayline, yend = ymax),colour = line_color)+
+    
+    # 6.Rectangle in Front of the Goal Inside the Penalty Area
+    geom_rect(aes(xmin=xmin, xmax=sixYardDef, ymin=sixYardLeft, ymax=sixYardRight), fill = grass_color, colour = line_color)+ # Sol
+    geom_rect(aes(xmin=sixYardOff, xmax=xmax, ymin=sixYardLeft, ymax=sixYardRight), fill = grass_color, colour = line_color)+ # Sağ
+    
+    # 7.Half Court Circle
+    geom_path(data=center_circle, aes(x=x,y=y), colour = line_color)+
+    geom_point(aes(x = penSpotDef , y = CentreSpot), colour = line_color, size = 0.9)+ # Sol
+    geom_point(aes(x = penSpotOff , y = CentreSpot), colour = line_color, size = 0.9)+ # Sağ
+    
+   
+    geom_point(aes(x = halfwayline , y = CentreSpot), colour = line_color)+
+    
+    # Drawing the Penalty Box
+    
+    annotate("path",
+             x = 12 + 10 * cos(seq(-0.3*pi, 0.3*pi, length.out = 30)),
+             y = 40 + 10 * sin(seq(-0.3*pi, 0.3*pi, length.out = 30)),
+             col = line_color) +
+    annotate("path",
+             x = (120-12) - 10 * cos(seq(-0.3*pi, 0.3*pi, length.out = 30)),
+             y = 40 + 10 * sin(seq(-0.3*pi, 0.3*pi, length.out = 30)),
+             col = line_color)
+  
+  if(goaltype == "box"){
+    
+    plot <- plot+
+      geom_rect(aes(xmin = xmin - 2 , ymin = goalPostLeft, xmax = xmin, ymax = goalPostRight), fill = grass_color, colour = line_color)+
+      geom_rect(aes(xmin = xmax, ymin = goalPostLeft, xmax = xmax + 2, ymax = goalPostRight), fill = grass_color, colour = line_color)
+    
+  }else if(goaltype == "line"){
+    
+    plot <- plot+
+      geom_segment(aes(x = xmin, y = goalPostLeft, xend = xmin, yend = goalPostRight),colour = goal_color, size = 1) + # Sol
+      geom_segment(aes(x = xmax, y = goalPostLeft, xend = xmax, yend = goalPostRight),colour = goal_color, size = 1) # Sağ
+    
+  }else if(goaltype == "barca_numbers"){
+    
+    plot <- plot+
+      geom_segment(aes(x = xmin - 0.75, y = goalPostLeft, xend = xmin - 0.75, yend = goalPostRight),colour = line_color, size = 0.75)+
+      geom_segment(aes(x = xmax + 0.75, y = goalPostLeft, xend = xmax + 0.75, yend = goalPostRight),colour = line_color, size = 0.75)
+    
+  }else{
+    return(NULL)
+  }
+  
+  
+  
+  TopLeftCorner <- circleFun(c(xmin,ymax),2.27,npoints = 50)
+  TopRightCorner <- circleFun(c(xmax,ymax),2.27,npoints = 50)
+  BottomLeftCorner <- circleFun(c(xmin,ymin),2.27,npoints = 50)
+  BottomRightCorner <- circleFun(c(xmax,ymin),2.27,npoints = 50)
+  
+  plot <- plot+
+    geom_path(data=TopLeftCorner %>% filter(x > 0, y < 80) , aes(x=x,y=y), colour = line_color)+
+    geom_path(data=BottomLeftCorner %>% filter(x > 0, y > 0) , aes(x=x,y=y), colour = line_color)+
+    geom_path(data=TopRightCorner %>% filter(x < 120, y < 80) , aes(x=x,y=y), colour = line_color) +
+    geom_path(data=BottomRightCorner %>% filter(x < 120, y > 0) , aes(x=x,y=y), colour = line_color)
+  
+  
+  
+  
+  return(plot)
+}
+
+```
+```{r}
+library(ggplot2)
+pitch()
+```
+
+
+---
+
+### Lionel Messi vs Cristiano Ronaldo
+```{r}
+library(gridExtra)
+library(tibble)
+library(dplyr)
+library(magrittr)
+library(cowplot)
+library(sure)
+plot_player_ratings <- function(data, player_name)({
+    
+    player <- data%>%filter(Name == player_name)%>%select(Position, LS:GK)
+    # Transform from column to observation
+    player <- suppressWarnings(as.data.frame(t(player)) %>% 
+      rownames_to_column("Pos") %>% 
+      filter(Pos != "Position")%>%
+      mutate(V1 = as.numeric(str_sub(V1, end = 2)),
+             Pos = as.character(Pos)))
+
+    # Create pitch & positions
+    pos <- data.frame(
+      Pos = as.character(c("GK","LB","LCB","CB", "RCB","RB",
+                          "LWB", "LDM", "CDM", "RDM", "RWB",
+                          "LM", "LCM", "CM", "RCM", "RM",
+                          "LAM", "CAM", "RAM",
+                          "LW","LF","CF","RF","RW",
+                          "LS","ST","RS")), 
+      x = c(7, rep(20,5), rep(38, 5), rep(55, 5), rep(72, 3), rep(90,5), rep(110,3)),
+      y = c(40,rep(c(10, 25, 40,55,70), 3), c(20, 40, 60),c(10, 25, 40, 55,70), c(20, 40, 60)))%>%suppressWarnings()%>%suppressMessages()
+    
+    # Join player data & pitch
+    player <- left_join(player, pos, by = 'Pos')%>%suppressWarnings()%>%suppressMessages()
+
+    # Remove an unnecessary observation
+    player <- na.omit(player)%>%suppressWarnings()%>%suppressMessages()
+    
+    
+    p <- pitch(pitch_theme = "blue")+coord_flip()+
+        geom_point(player, mapping = aes(x,y, fill = if_else(V1 < 50, "orangered", 
+                                        if_else(V1 <60, "orange",
+                                                if_else(V1 < 70, "goldenrod1", 
+                                                        if_else(V1 <80, "palegreen4",
+                                                                if_else(V1 < 90, "forestgreen",
+                                                                        if_else(V1 == 0,
+                                                                                "orangered","darkgreen"))))))), shape = 21, size = 15, show.legend = FALSE)+
+    geom_text(player, mapping = aes(x,y, label = Pos), vjust= -0.5, color = "white", size = 2.5, fontface = "bold")+
+    geom_text(player, mapping = aes(x,y, label = V1), vjust = 1.5, fontface = "bold", color = "white")+
+    scale_fill_identity()+
+    labs(title = paste0(player_name,"'s Overall Ratings on the Pitch"))+
+    theme(plot.title = element_text(hjust = 0.5,vjust = -1, size = 10, color = "white", face = "bold"))
+    return(p)
+    
+})
+    
+
+options(repr.plot.width = 20, repr.plot.height = 16)    
+grid.arrange(
+    ggdraw() +
+      draw_plot(plot_player_ratings(df, "L. Messi")) +
+      draw_image(df%>%filter(Name == "L. Messi")%>%pull(Player.Photo)%>%as.character, scale=0.15, y=0.3, x=-0.34)+
+      draw_image(df%>%filter(Name == "L. Messi")%>%pull(Club.Logo)%>%as.character, scale=0.15, y=0.3, x=0.34),
+    ggdraw() +
+      draw_plot(plot_player_ratings(df, "Cristiano Ronaldo")) +
+      draw_image(df%>%filter(Name == "Cristiano Ronaldo")%>%pull(Player.Photo)%>%as.character, scale=0.15, y=0.3, x=-0.34)+
+      draw_image(df%>%filter(Name == "Cristiano Ronaldo")%>%pull(Club.Logo)%>%as.character, scale=0.15, y=0.3, x=0.34),
+    ncol = 2
+    )
+     
+```
+```{r}
+players <- df2 %>% 
+  filter(Name %in% c("Cristiano Ronaldo", "L. Messi")) %>% 
+# Unite Name & Club variables
+  mutate(Name = paste0(Name, ", ", Club)) %>%
+# Selection abilities of the players
+  select(Name,Crossing:Sliding.Tackle, -Mentality, -Power, -Defending, -Skill, -Movement ) %>% 
+# Correction of the punctuation
+  rename_all(funs(gsub("[[:punct:]]", " ", .))) %>% 
+# Transform from Variable to Observation
+  gather(Skill, Exp, Crossing:`Sliding Tackle`, -Name)
+
+
+options(repr.plot.width = 15, repr.plot.height = 8)
+
+
+ggplot(players, aes(Skill, Exp, fill = Name))+
+  geom_col(show.legend = FALSE)+
+  coord_flip()+
+  facet_wrap(Name~.)+
+  scale_fill_manual(values = c("#59545c", "#9623e8"))+
+  theme_minimal()+
+  theme(
+      strip.text = element_text(size = 15),
+      axis.title = element_text(size = 8),
+      axis.text = element_text(size = 8)
+  )
+```
+```{r}
+options(repr.plot.width = 15, repr.plot.height = 8)
+
+
+ggplot(players, aes(Skill, Exp, fill = Name))+
+  geom_col(position = "fill")+
+  coord_flip()+
+  scale_fill_manual(values = c("#26241f", "#eda411"))+
+  theme_minimal()+
+  theme(
+      strip.text = element_text(size = 20),
+      axis.title = element_text(size = 13),
+      axis.text = element_text(size = 8),
+      legend.text = element_text(size = 16),
+      plot.caption = element_text(size= 10)
+  )+
+  geom_hline(yintercept = 0.5, color = "white", size = 1, linetype = 2)+
+  theme(legend.position = "top", axis.text.x=element_blank())+
+  labs(caption = "@EA Sports - FIFA 21",
+       fill = NULL,x = NULL, y = NULL)
+```
