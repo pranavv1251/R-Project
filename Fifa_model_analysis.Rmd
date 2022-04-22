@@ -23,7 +23,7 @@ df <- read.csv("/home/oem/Code/mlprojects/FIFA/fifa21_male2.csv", stringsAsFacto
 ```{r}
 library(data.table)
 setDT(FullData)
-setDT(complemento)
+setDT(complement)
 names(FullData)
 ```
 We have a fairly complete dataset. The first 94 columns are mostly quantitative variables, Some are personal data of the players such as their age, height, etc. and others are statistical data. From column 95 are Boolean qualities of each player.
@@ -195,7 +195,7 @@ g4<- FullData[FullData$grupo==4,]
 plotcluster(cluster[,1:(ncol(cluster)-1)],km$cluster)
 
 ```
-The Group 1 has 15752 players, Group 3 has 46 players, Group 4 has 1859 players and Group 2 has 337 players. These values total 17994.
+The Group 2 has 15752 players, Group 4 has 46 players, Group 3 has 1859 players and Group 1 has 337 players. These values total 17994.
 
 ---
 
@@ -258,11 +258,11 @@ With the previous explorations, it can be said that nationality does not govern 
 In the following groups
 
   - Group 2
-  - Group 4
   - Group 3
   - Group 1
+  - Group 4
 
-They are sorted in descending order according to their number of players. You can see that Group 2 contains 46 players and Group 2 has 337 players. This only represent 2.12848727 % of the players. Leaving the rest as players outside of world class players.
+They are sorted in descending order according to their number of players. You can see that Group 4 contains 46 players and Group 1 has 337 players. This only represent 2.12848727 % of the players. Leaving the rest as players outside of world class players.
 
 ---
 
@@ -285,7 +285,7 @@ id_overall = FullData[,c(1,20)]
 specs = cbind(specs,id_overall)
 
 ##Getting preferred_positions and ID
-positions = complemento[,c(53,64)]   
+positions = complement[,c(53,64)]   
 positions = data.frame(positions)
 
 ## Cleaning Preferred Positions
